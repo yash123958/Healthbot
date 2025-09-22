@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vaccine Tracker</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg,#0f172a,#1e293b);
+  margin:0; color:#fff; min-height:100vh;
+  display:flex; justify-content:center; align-items:flex-start; padding-top:40px;
+}
+
+/* Glassmorphism */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.container {
+  max-width:950px; width:95%;
+  border-radius:25px; padding:30px;
+  box-shadow:0 20px 50px rgba(0,0,0,0.6);
+}
+h1 {
+  text-align:center; font-size:2rem; font-weight:800;
+  margin-bottom:20px; color:#F97316;
+  text-shadow: 1px 1px 5px rgba(0,0,0,0.5);
+}
+table { width:100%; border-collapse:collapse; }
+th, td {
+  padding:12px 15px; text-align:left;
+  border-bottom:1px solid rgba(255,255,255,0.1);
+  vertical-align: top;
+}
+th {
+  background: rgba(255,255,255,0.1);
+  color:#22C55E;
+  backdrop-filter: blur(10px);
+}
+tr:hover {
+  background: rgba(34,197,94,0.15);
+  transition: 0.3s;
+}
+button {
+  margin-top:20px; padding:10px 20px; border:none; border-radius:15px; cursor:pointer;
+  background:linear-gradient(45deg,#F97316,#22C55E); color:#fff; font-weight:600;
+  box-shadow:0 4px 15px rgba(0,0,0,0.4);
+}
+button:hover {
+  transform:scale(1.05);
+  transition:0.3s;
+}
+</style>
+</head>
+<body>
+
+<div class="container glass">
+  <h1>🧾 Vaccine Tracker (Odisha Govt.)</h1>
+  <table class="glass">
+    <thead>
+      <tr>
+        <th>Vaccine</th>
+        <th>Dose</th>
+        <th>Scheduled Date</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody id="vaccineTable"></tbody>
+  </table>
+  <button onclick="goBack()">⬅️ Back to Chat</button>
+</div>
+
+<script>
+// Vaccine data with doses, days after birth/today, and details
+const vaccines = [
+  { name: "BCG", doses: [{ dose: "1st", scheduled: 0, details: "Protects against tuberculosis. Given once at birth. Odisha Govt Universal Immunization Program." }] },
+  { name: "Hepatitis B", doses: [
+      { dose: "1st", scheduled: 0, details: "First dose at birth. Prevents Hepatitis B infection." },
+      { dose: "2nd", scheduled: 42, details: "Second dose 6 weeks after birth." },
+      { dose: "3rd", scheduled: 98, details: "Third dose 14 weeks after birth." }
+    ] 
+  },
+  { name: "OPV (Polio)", doses: [
+      { dose: "1st", scheduled: 42, details: "Oral polio vaccine, first dose at 6 weeks." },
+      { dose: "2nd", scheduled: 70, details: "Second dose at 10 weeks." },
+      { dose: "3rd", scheduled: 98, details: "Third dose at 14 weeks." }
+    ] 
+  },
+  { name: "DTP", doses: [
+      { dose: "1st", scheduled: 42, details: "Protects against Diphtheria, Tetanus, Pertussis." },
+      { dose: "2nd", scheduled: 70, details: "Second dose at 10 weeks." },
+      { dose: "3rd", scheduled: 98, details: "Third dose at 14 weeks." }
+    ] 
+  },
+  { name: "MMR", doses: [
+      { dose: "1st", scheduled: 270, details: "Measles, Mumps, Rubella. First dose at 9 months." },
+      { dose: "2nd", scheduled: 450, details: "Second dose at 15 months." }
+    ] 
+  },
+  { name: "COVID-19", doses: [
+      { dose: "As per govt guidelines", scheduled: 0, details: "Protects against COVID-19 infection. Dates vary by age and dose." }
+    ] 
+  },
+  { name: "Varicella (Chickenpox)", doses: [
+      { dose: "1st", scheduled: 365, details: "Protects against chickenpox. First dose at 12 months." },
+      { dose: "2nd", scheduled: 365*5, details: "Second dose around 4–6 years." }
+    ] 
+  },
+  { name: "JE (Japanese Encephalitis)", doses: [
+      { dose: "1st", scheduled: 270, details: "First dose at 9–12 months." },
+      { dose: "2nd", scheduled: 630, details: "Second dose at 16–24 months." }
+    ] 
+  },
+  { name: "Typhoid Conjugate Vaccine (TCV)", doses: [
+      { dose: "1st", scheduled: 180, details: "Given to children 6 months–15 years." }
+    ] 
+  },
+  { name: "Influenza (Flu)", doses: [
+      { dose: "1st", scheduled: 0, details: "Annual dose for children and high-risk adults." }
+    ] 
+  },
+  { name: "HPV", doses: [
+      { dose: "1st", scheduled: 9*365, details: "Prevents cervical cancer. Recommended for adolescent girls aged 9–14." },
+      { dose: "2nd", scheduled: 9*365+180, details: "Follow-up dose 6–12 months after first." }
+    ] 
+  }
+];
+
+// Populate table
+const tableBody = document.getElementById("vaccineTable");
+const today = new Date();
+
+function formatDate(date) {
+    const dd = String(date.getDate()).padStart(2,'0');
+    const mm = String(date.getMonth()+1).padStart(2,'0');
+    const yyyy = date.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
+}
+
+vaccines.forEach(v => {
+    v.doses.forEach(d => {
+        const schedDate = new Date(today);
+        schedDate.setDate(today.getDate() + d.scheduled);
+        const row = document.createElement("tr");
+        row.className = "glass"; // glass effect for each row
+        row.innerHTML = `
+            <td>${v.name}</td>
+            <td>${d.dose}</td>
+            <td>${formatDate(schedDate)}</td>
+            <td>${d.details}</td>
+        `;
+        tableBody.appendChild(row);
+    });
+});
+
+// Back button
+function goBack() {
+    window.location.href = "index.html";
+}
+</script>
+
+</body>
+</html>

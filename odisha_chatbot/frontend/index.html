@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Odisha Healthcare AI Chat</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body {
+  font-family:'Segoe UI',sans-serif;
+  background:linear-gradient(135deg,#0f172a,#1e293b);
+  margin:0; display:flex; justify-content:center; align-items:center; height:100vh; color:#fff;
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.chat-container {
+  max-width:600px;width:95%;height:85vh;border-radius:25px;
+  display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 20px 50px rgba(0,0,0,0.6);
+}
+.chat-header { text-align:center;padding:20px;
+  background:linear-gradient(90deg,#F97316,#22C55E);
+  color:#fff;font-weight:800;font-size:1.6rem;
+  text-shadow:1px 1px 5px rgba(0,0,0,0.5);
+}
+.chat-messages {
+  flex:1;padding:20px;overflow-y:auto; display:flex; flex-direction:column; gap:15px; scrollbar-width:thin;
+  scrollbar-color:#22c55e transparent; white-space: pre-line;
+}
+.chat-messages::-webkit-scrollbar {width:8px;}
+.chat-messages::-webkit-scrollbar-thumb {background:#22c55e;border-radius:10px;}
+.message { max-width:75%; padding:14px 18px; border-radius:20px; font-size:15px; line-height:1.6; word-wrap:break-word; transition:0.3s; color:#fff;}
+.message.user { background:rgba(34,197,94,0.4); align-self:flex-end; box-shadow:0 5px 15px rgba(34,197,94,0.4);}
+.message.bot { background:rgba(51,65,85,0.5); align-self:flex-start; border-left:5px solid #F97316;}
+.chat-input {
+  display:flex; padding:15px; gap:10px; align-items:center;
+}
+textarea {
+  flex:1; padding:12px; border-radius:15px; border:none; background:rgba(255,255,255,0.08); color:#fff; resize:none;
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+}
+textarea:focus { outline:none; box-shadow:0 0 15px rgba(249,115,22,0.6);}
+button {
+  padding:0 25px; border:none; border-radius:15px; 
+  background:linear-gradient(45deg,#F97316,#22C55E); color:#fff; cursor:pointer; transition:0.3s;
+}
+button:hover:not(:disabled){transform:translateY(-3px) scale(1.05);}
+select{
+  background:rgba(255,255,255,0.08);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  color:#fff;padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);
+}
+</style>
+</head>
+<body>
+
+<div class="chat-container glass">
+  <div class="chat-header">Odisha Healthcare AI Bot</div>
+  <div class="chat-messages glass" id="chatMessages"></div>
+
+  <div class="chat-input glass">
+    <select id="language">
+      <option value="en">🇬🇧 English</option>
+      <option value="hi">🇮🇳 Hindi</option>
+      <option value="or">🌸 Odia</option>
+    </select>
+    <textarea id="userQuery" placeholder="Type your health question..." rows="1"></textarea>
+    <button id="sendBtn">Send</button>
+    <button id="vaccineBtn">💉 Vaccine Tracker</button>
+  </div>
+</div>
+
+<script>
+let userEmail = "";
+let chatHistory = [];
+
+// Automatically detect backend URL (localhost for dev, deployed for Vercel)
+const BACKEND_URL = window.location.hostname.includes("localhost") 
+    ? "http://localhost:3000" 
+    : "https://your-backend.vercel.app"; // 🔹 replace with your actual deployed backend
+
+// Prompt for email at login
+function loginPrompt() {
+    const email = prompt("Enter your email to receive the chat transcript:");
+    if(email) {
+        userEmail = email;
+        alert("✅ Email saved: " + userEmail);
+    }
+}
+
+// Call Gemini AI
+async function callGemini(query, lang){
+    try{
+        const res = await fetch(`${BACKEND_URL}/get-ai-response`,{
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({query,lang})
+        });
+        const data = await res.json();
+        return data.answer || "No answer received.";
+    }catch(err){ console.error(err); return "⚠️ Error connecting to backend."; }
+}
+
+// Add messages to chat & chatHistory
+function addMessage(text,sender){
+    const chat = document.getElementById("chatMessages");
+    const msg = document.createElement("div"); msg.className=`message ${sender} glass`;
+    let cleanText = text.replace(/\*+/g,'').trim();
+    const lines = cleanText.split(/\n/).map(line=>{
+        line=line.trim();
+        if(line.endsWith(':')) return `<b>${line}</b>`; else return line;
+    }).join('<br>');
+    msg.innerHTML = lines;
+    chat.appendChild(msg);
+    chat.scrollTop=chat.scrollHeight;
+    msg.style.opacity=0; msg.style.transition="opacity 0.5s ease-in";
+    setTimeout(()=>msg.style.opacity=1,50);
+
+    chatHistory.push({ role: sender, content: text });
+}
+
+// Typing indicator
+function showTyping(){
+    const chat=document.getElementById("chatMessages");
+    const typing=document.createElement("div");
+    typing.className="message bot glass typing-indicator";
+    typing.style.borderLeft="5px solid #F97316";
+    typing.style.maxWidth="40%"; typing.style.padding="10px 15px";
+    typing.style.borderRadius="20px"; typing.style.fontStyle="italic";
+    typing.textContent='AI is typing...'; chat.appendChild(typing); chat.scrollTop=chat.scrollHeight;
+    return typing;
+}
+
+// Send user query
+document.getElementById("sendBtn").addEventListener("click",async()=>{
+    if(!userEmail) { loginPrompt(); if(!userEmail) return; }
+
+    const queryBox=document.getElementById("userQuery");
+    const lang=document.getElementById("language").value;
+    const query=queryBox.value.trim(); if(!query) return;
+    addMessage(query,"user"); queryBox.value="";
+    const typingEl=showTyping();
+    const answer=await callGemini(query,lang);
+    typingEl.remove();
+    addMessage(answer,"bot");
+});
+
+// Vaccine button
+document.getElementById("vaccineBtn").addEventListener("click",()=>{window.open("vaccine.html","_blank");});
+
+// Automatically send transcript when user closes or reloads page
+window.addEventListener("beforeunload", async (e) => {
+    if(userEmail && chatHistory.length > 0){
+        try{
+            await fetch(`${BACKEND_URL}/send-chat`,{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({ chatHistory, toEmail: userEmail })
+            });
+        }catch(err){ console.error("Failed to send chat transcript:", err); }
+    }
+});
+</script>
+
+</body>
+</html>
